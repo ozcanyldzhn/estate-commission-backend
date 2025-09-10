@@ -1,7 +1,22 @@
 import { Money } from '../domain/money.js';
 
+function json(res, code, obj) {
+  res.writeHead(code, { 'Content-Type': 'application/json' });
+  res.end(JSON.stringify(obj));
+}
+function badRequest(m) { const e = new Error(m); e.statusCode = 400; return e; }
+function notFound(m)  { const e = new Error(`${m} not found`); e.statusCode = 404; return e; }
+
+// BigInt tutarları insan-okur stringe çevir (örn. 5000n -> "50.00")
+function formatShares(shares = []) {
+  return shares.map(s => ({
+    ...s,
+    amount: Money.toDecimalString(s.amount)
+  }));
+}
+
 export function registerTransactionRoutes({ addRoute, container }) {
-  // Yeni işlem oluştur
+  // 1) Yeni işlem oluştur
   addRoute('POST', '/transactions', async (req, res, { transactions, audit }) => {
     const { totalFee, listingAgentId, sellingAgentId, currency = 'GBP' } = req.body || {};
     if (totalFee == null || !listingAgentId || !sellingAgentId) throw badRequest('missing fields');
@@ -13,11 +28,10 @@ export function registerTransactionRoutes({ addRoute, container }) {
     });
     audit.log('Transaction', 'CREATE', { id: tx.id });
 
-    res.writeHead(201, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ id: tx.id }));
+    json(res, 201, { id: tx.id });
   });
 
-  // Aşamayı ilerlet
+  // 2) Aşamayı ilerlet
   addRoute('PATCH', '/transactions/stage', async (req, res, { transactions, workflow, audit }) => {
     const { id, nextStage } = req.body || {};
     if (!id || !nextStage) throw badRequest('missing fields');
@@ -29,11 +43,10 @@ export function registerTransactionRoutes({ addRoute, container }) {
     await transactions.update(id, { stage: nextStage });
     audit.log('Transaction', 'STAGE', { id, from: tx.stage, to: nextStage });
 
-    res.writeHead(204);
-    res.end();
+    res.writeHead(204); res.end();
   });
 
-  // İşlemi tamamla (ve komisyonu dağıt)
+  // 3) İşlemi tamamla (ve komisyonu dağıt)
   addRoute('POST', '/transactions/complete', async (req, res, { transactions, commission }) => {
     const { id } = req.body || {};
     if (!id) throw badRequest('missing id');
@@ -41,10 +54,13 @@ export function registerTransactionRoutes({ addRoute, container }) {
     const tx = await transactions.findById(id);
     if (!tx) throw notFound('transaction');
 
+    // Idempotent: zaten tamamlandıysa mevcut kırılımı döndür
     if (tx.stage === 'COMPLETED') {
-      // idempotent: aynı işlem tekrar çağrılırsa mevcut kırılım döner
-      const shares = commission.getShares(tx.id);
-      return json(res, 200, { totalFee: Money.toDecimalString(tx.totalFeeCents), shares });
+      const shares = commission.getShares(tx.id) || [];
+      return json(res, 200, {
+        totalFee: Money.toDecimalString(tx.totalFeeCents),
+        shares: formatShares(shares)
+      });
     }
 
     if (tx.stage !== 'TITLE_DEED') throw badRequest('must be at TITLE_DEED before complete');
@@ -56,10 +72,13 @@ export function registerTransactionRoutes({ addRoute, container }) {
       sellingAgentId: tx.sellingAgentId
     });
 
-    return json(res, 200, { totalFee: Money.toDecimalString(tx.totalFeeCents), shares });
+    return json(res, 200, {
+      totalFee: Money.toDecimalString(tx.totalFeeCents),
+      shares: formatShares(shares)
+    });
   });
 
-  // Finansal kırılım görüntüle
+  // 4) Finansal kırılımı getir
   addRoute('GET', '/transactions/breakdown', async (req, res, { reporting }) => {
     const url = new URL(req.url, 'http://localhost');
     const id = url.searchParams.get('id');
@@ -71,11 +90,3 @@ export function registerTransactionRoutes({ addRoute, container }) {
     json(res, 200, data);
   });
 }
-
-// Yardımcılar
-function json(res, code, obj) {
-  res.writeHead(code, { 'Content-Type': 'application/json' });
-  res.end(JSON.stringify(obj));
-}
-function badRequest(m) { const e = new Error(m); e.statusCode = 400; return e; }
-function notFound(m) { const e = new Error(`${m} not found`); e.statusCode = 404; return e; }
