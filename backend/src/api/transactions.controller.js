@@ -80,7 +80,7 @@ export function registerTransactionRoutes({ addRoute, container }) {
 
   // 4) Finansal kırılımı getir
   addRoute('GET', '/transactions/breakdown', async (req, res, { reporting }) => {
-    const url = new URL(req.url, 'http://localhost');
+    const url = new URL(req.url, 'https://estate-commission-backend.onrender.com');
     const id = url.searchParams.get('id');
     if (!id) throw badRequest('missing id');
 

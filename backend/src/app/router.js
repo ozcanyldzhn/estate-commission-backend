@@ -9,7 +9,7 @@ function match(method, path) {
 }
 
 export async function dispatch(req, res, container) {
-  const url = new URL(req.url, 'http://localhost');
+  const url = new URL(req.url, 'https://estate-commission-backend.onrender.com');
   const r = match(req.method, url.pathname);
   if (!r) {
     res.writeHead(404);
