@@ -89,4 +89,11 @@ export function registerTransactionRoutes({ addRoute, container }) {
 
     json(res, 200, data);
   });
+
+  addRoute('GET', '/health', async (_req, res) => {
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ ok: true, ts: new Date().toISOString() }));
+  });
 }
+
+
