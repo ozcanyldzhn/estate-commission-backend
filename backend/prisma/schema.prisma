@@ -1,0 +1,60 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL") 
+}
+
+model User {
+  id        String        @id @default(cuid())
+  email     String        @unique
+  name      String
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+  transactions Transaction[]
+}
+
+model Transaction {
+  id               String   @id @default(cuid())
+  userId           String
+  propertyId       String
+  propertyType     PropertyType
+  grossPrice       Decimal  @db.Decimal(18,2)
+  commissionRate   Decimal  @db.Decimal(5,2)
+  commissionAmount Decimal  @db.Decimal(18,2)
+  currency         String   @default("TRY")
+  stage            TransactionStage @default(AGREEMENT)
+  listingAgentId   String
+  sellingAgentId   String
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  user             User     @relation(fields: [userId], references: [id])
+  shares           CommissionShare[]
+}
+
+model CommissionShare {
+  id            String   @id @default(cuid())
+  transactionId String
+  agentId       String
+  amount        Decimal  @db.Decimal(18,2)
+  createdAt     DateTime @default(now())
+
+  transaction   Transaction @relation(fields: [transactionId], references: [id])
+}
+
+enum PropertyType {
+  RESIDENTIAL
+  COMMERCIAL
+  LAND
+}
+
+enum TransactionStage {
+  AGREEMENT
+  EARNEST_MONEY
+  TITLE_DEED
+  COMPLETED
+}

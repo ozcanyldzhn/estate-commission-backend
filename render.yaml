@@ -1,0 +1,20 @@
+services:
+  - type: web
+    name: estate-commission-backend
+    env: node
+    rootDir: backend                # monorepoysa örn: backend
+    plan: free                # ücretli plan kullanıyorsan değiştir
+    buildCommand: |
+      npm ci
+      npm run generate
+      npm run build
+    startCommand: |
+      npx prisma migrate deploy
+      npm run start
+    autoDeploy: true
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        sync: false           # Render’da GUI’den bir secret olarak set edeceksin
